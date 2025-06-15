@@ -11,6 +11,8 @@ const messageInput = document.getElementById('message-input');
 const chatForm = document.getElementById('chat-form');
 const attachBtn = document.getElementById('attach-btn');
 const fileInput = document.getElementById('file-input');
+const emojiBtn = document.getElementById('emoji-btn');
+const emojiPanel = document.getElementById('emoji-panel');
 
 if (!chattingWith) {
   alert('No chat target specified. Please open a chat from the user list.');
@@ -233,6 +235,35 @@ socket.on('receive_file', ({ from, to, fileName, fileType, dataUrl, time }) => {
 });
 
 // Handle file attachment click
+// ===== Emoji Picker =====
+const emojis = ['😀','😂','😊','😍','😘','😎','🤔','😢','😡','👍','🙏','🔥','🎉','❤️','💔','✨','✅','❌','⚽','🏀','🥳','😴','🙌','🤖','👀','🤩'];
+function buildEmojiPanel(){
+  emojiPanel.innerHTML='';
+  emojis.forEach(e=>{
+    const span=document.createElement('span');
+    span.textContent=e;
+    span.onclick=(ev)=>{
+      messageInput.value+=e;
+      messageInput.focus();
+      emojiPanel.style.display='none';
+    };
+    emojiPanel.appendChild(span);
+  });
+}
+if(emojiBtn){
+  emojiBtn.onclick=(e)=>{
+    e.stopPropagation();
+    if(emojiPanel.style.display==='block'){
+      emojiPanel.style.display='none';
+      return;
+    }
+    if(!emojiPanel.hasChildNodes()) buildEmojiPanel();
+    emojiPanel.style.display='block';
+  };
+  document.addEventListener('click',()=>{emojiPanel.style.display='none';});
+}
+// ========================
+
 attachBtn.onclick = () => {
   fileInput.click();
 };
