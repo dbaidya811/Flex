@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Real-Time Chat App</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/2673/2673791.png">
+</head>
+<body>
+  <div id="auth-container">
+    <div class="auth-box">
+      <header class="auth-header">
+        <h1>Welcome to ChatApp</h1>
+      </header>
+      <div id="signup-box">
+        <h2>Sign Up</h2>
+        <input type="text" id="signup-name" placeholder="Name" required>
+        <input type="text" id="signup-userid" placeholder="User ID" required>
+        <input type="email" id="signup-email" placeholder="Email" required>
+        <input type="password" id="signup-password" placeholder="Password" required>
+        <button id="signup-btn">Sign Up</button>
+        <p>Already have an account? <span id="show-login">Login here</span></p>
+        <div class="error" id="signup-error"></div>
+      </div>
+      <div id="login-box" style="display:none;">
+        <h2>Login</h2>
+        <input type="text" id="login-name" placeholder="Name" required>
+        <input type="text" id="login-userid" placeholder="User ID" required>
+        <input type="password" id="login-password" placeholder="Password" required>
+        <button id="login-btn">Login</button>
+        <p>Don't have an account? <span id="show-signup">Sign up here</span></p>
+        <div class="error" id="login-error"></div>
+      </div>
+    </div>
+  </div>
+  <div id="chat-container" style="display:none;">
+    <header class="app-header">
+      <h1>ChatApp</h1>
+    </header>
+    <div id="user-list-box">
+      <h3>Online Users</h3>
+      <ul id="user-list"></ul>
+    </div>
+
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

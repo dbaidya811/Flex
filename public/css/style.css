@@ -1,0 +1,417 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+body {
+  font-family: 'Inter', Arial, sans-serif;
+  background: #f4f6fb;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+#error, .error {
+  color: #dc3545;
+  font-size: 0.95em;
+  margin: 8px 0 0 0;
+  text-align: center;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #f0f2f5; /* Light gray background */
+}
+
+#auth-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}
+
+#chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  background: #f9f9f9;
+  box-shadow: 0 0 20px rgba(0,0,0,0.1);
+}
+
+.app-header {
+  background: linear-gradient(90deg, #6a11cb 0%, #2575fc 100%);
+  color: white;
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.5em;
+}
+
+
+
+#user-list-box {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 15px;
+}
+
+.header {
+  background: #2A7AF7;
+  color: #fff;
+  padding: 18px 26px;
+  font-size: 1.3em;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  border-bottom: none;
+  text-align: left;
+}
+
+#signup-box, #login-box {
+  background: #fff;
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  width: 360px;
+  text-align: center;
+  margin-bottom: 14px;
+  animation: fadeIn 0.7s;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+#signup-box h2, #login-box h2 {
+  text-align: center;
+  margin-bottom: 18px;
+  color: #2563eb;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+#signup-box input, #login-box input {
+  width: 100%;
+  padding: 12px 36px 12px 12px;
+  margin: 10px 0;
+  border: 1.5px solid #c3d0e0;
+  border-radius: 8px;
+  background: #f9fbfd;
+  transition: border 0.2s, box-shadow 0.2s;
+  font-size: 1em;
+  font-family: 'Inter', Arial, sans-serif;
+}
+#signup-box input:focus, #login-box input:focus {
+  border: 1.5px solid #2563eb;
+  outline: none;
+  background: #eaf6ff;
+  box-shadow: 0 0 0 2px #b5d3fa33;
+}
+
+#signup-box input:focus, #login-box input:focus {
+  border: 1.5px solid #007bff;
+  outline: none;
+  background: #eaf6ff;
+}
+
+#signup-btn, #login-btn {
+  width: 100%;
+  padding: 13px;
+  background: #2A7AF7;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1em;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 12px;
+  transition: background 0.2s;
+  box-shadow: none;
+}
+#signup-btn:hover, #login-btn:hover {
+  background: #2466c1;
+}
+
+
+
+#signup-box p, #login-box p {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 1em;
+  color: #4b5563;
+}
+
+#show-login, #show-signup {
+  display: inline-block;
+  background: linear-gradient(90deg, #2563eb 60%, #74ebd5 100%);
+  color: #fff;
+  font-weight: 600;
+  padding: 5px 18px;
+  border-radius: 18px;
+  box-shadow: 0 2px 8px rgba(37,99,235,0.10);
+  text-decoration: none;
+  margin-left: 6px;
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+  font-size: 1em;
+}
+#show-login:hover, #show-signup:hover {
+  background: linear-gradient(90deg, #1e40af 60%, #38bdf8 100%);
+  transform: scale(1.07);
+  box-shadow: 0 4px 16px rgba(37,99,235,0.15);
+}
+#show-login:hover {
+  background: linear-gradient(90deg, #0056b3 60%, #74ebd5 100%);
+  transform: scale(1.07);
+  box-shadow: 0 4px 16px rgba(0,123,255,0.15);
+}
+
+#show-signup {
+  display: inline-block;
+  background: linear-gradient(90deg, #007bff 60%, #74ebd5 100%);
+  color: #fff;
+  font-weight: bold;
+  padding: 4px 16px;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0,123,255,0.08);
+  text-decoration: none;
+  margin-left: 6px;
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+}
+#show-signup:hover {
+  background: linear-gradient(90deg, #0056b3 60%, #74ebd5 100%);
+  transform: scale(1.07);
+  box-shadow: 0 4px 16px rgba(0,123,255,0.15);
+}
+
+#error, .error {
+  color: #dc3545;
+  font-size: 0.95em;
+  margin: 8px 0 0 0;
+  text-align: center;
+}
+
+input {
+  width: 100%;
+  padding: 12px;
+  margin: 10px 0;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-sizing: border-box; /* Add this */
+}
+button {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #6a11cb 0%, #2575fc 100%);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: opacity 0.2s;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+button:hover { background: #0056b3; }
+
+.user-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 10px;
+  margin-bottom: 10px;
+}
+
+
+#user-list-box { margin-bottom: 20px; }
+#user-list {
+  list-style: none;
+  padding: 0;
+}
+#user-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #e5e7eb;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+#user-list li:hover {
+  background-color: #f0f2f5;
+  transform: translateX(4px);
+}
+
+.avatar-container {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.user-avatar {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #007bff;
+  color: #fff;
+  font-weight: 600;
+  font-size: 1.1em;
+  border-radius: 50%;
+}
+
+.user-name-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.user-name-block .user-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.user-name-block .user-id {
+  font-size: 0.85em;
+  color: #777;
+}
+@keyframes pulse-dot {
+  0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(46, 204, 113, 0); }
+  100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
+}
+
+.online-dot {
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #2ecc71;
+  border: 2px solid white;
+  animation: pulse-dot 2s infinite;
+}
+
+.user-name-block .user-id {
+  font-size: 0.92rem;
+  color: #888;
+  font-weight: 400;
+  margin-top: 2px;
+}
+#chat-box {
+  margin-top: 18px;
+}
+#messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  background: #fff;
+  padding: 24px 12px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.message {
+  max-width: 68%;
+  padding: 12px 18px;
+  border-radius: 24px;
+  font-size: 1.06em;
+  word-break: break-word;
+  margin-bottom: 0;
+  margin-top: 0;
+  display: inline-block;
+  box-shadow: none;
+  line-height: 1.5;
+}
+.message.me {
+  background: #2A7AF7;
+  color: #fff;
+  align-self: flex-end !important;
+  text-align: right;
+  border-radius: 24px 24px 8px 24px;
+}
+.message.them {
+  background: #f1f2f6;
+  color: #222;
+  align-self: flex-start !important;
+  text-align: left;
+  border-radius: 24px 24px 24px 8px;
+}
+
+/* --- Responsive Design --- */
+@media (max-width: 600px) {
+  #signup-box, #login-box {
+    width: 90%;
+    padding: 25px;
+  }
+
+  #chat-container {
+    max-width: 100%;
+    width: 100%;
+    height: 100vh; /* Full viewport height */
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .app-header h1 {
+    font-size: 1.2em;
+  }
+
+  #user-list li {
+    padding: 8px 10px;
+  }
+}
+
+#close-chat {
+  background: #dc3545;
+  margin-left: 8px;
+  color: #fff;
+  border-radius: 8px;
+  padding: 7px 18px;
+  font-weight: 600;
+  border: none;
+  transition: background 0.2s;
+  box-shadow: none;
+}
+#close-chat:hover {
+  background: #a71d2a;
+}
+
+
+
+/* Responsive Design */
+@media (max-width: 600px) {
+  #auth-container, #chat-container {
+    max-width: 100vw;
+    padding: 0;
+    border-radius: 0;
+  }
+  .header {
+    padding: 14px 10px;
+    font-size: 1.1em;
+  }
+  #signup-box, #login-box {
+    padding: 12px 2vw 10px 2vw;
+  }
+  #messages {
+    padding: 8px 2px;
+    min-height: 120px;
+  }
+  .message {
+    font-size: 0.98em;
+    padding: 8px 10px;
+  }
+}
