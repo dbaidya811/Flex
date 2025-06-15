@@ -65,6 +65,21 @@ app.post('/api/logout', (req, res) => {
   res.json({ message: 'Logged out' });
 });
 
+// Delete account endpoint
+app.post('/api/delete-account', (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ message: 'userId required' });
+  let users = readUsers();
+  const originalLen = users.length;
+  users = users.filter(u => u.userId !== userId);
+  if (users.length === originalLen) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+  writeUsers(users);
+  delete onlineUsers[userId];
+  res.json({ message: 'Account deleted' });
+});
+
 // Socket.IO for chat
 io.on('connection', (socket) => {
   console.log(`[Socket.IO] A user connected with socket ID: ${socket.id}`);

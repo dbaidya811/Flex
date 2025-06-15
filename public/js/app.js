@@ -20,11 +20,102 @@ const messagesDiv = document.getElementById('messages');
 const messageInput = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
 const closeChatBtn = document.getElementById('close-chat');
+// Dropdown menu elements
+const profileMenu = document.getElementById('profile-menu');
+const profileAvatar = document.getElementById('profile-avatar');
+function updateAvatar(){
+  if (profileAvatar){
+    profileAvatar.textContent = currentUserId ? currentUserId.charAt(0).toUpperCase() : '?';
+  }
+}
+// Toggle dropdown and rebuild items each time avatar clicked
+if(profileAvatar){
+  profileAvatar.onclick = (e)=>{
+    e.stopPropagation();
+    if(profileMenu.style.display==='block'){
+      profileMenu.style.display='none';
+      return;
+    }
+    buildProfileMenu();
+    profileMenu.style.display='block';
+  };
+  // hide menu on outside click
+  document.addEventListener('click',()=>{profileMenu.style.display='none';});
+}
+
+function buildProfileMenu(){
+  profileMenu.innerHTML='';
+  // Login
+  const loginBtn=document.createElement('button');
+  loginBtn.textContent='Login';
+  loginBtn.onclick=()=>{
+    profileMenu.style.display='none';
+    authContainer.style.display='block';
+    chatContainer.style.display='none';
+    loginBox.style.display='block';
+    signupBox.style.display='none';
+  };
+  profileMenu.appendChild(loginBtn);
+  // Sign up
+  const signupBtnMenu=document.createElement('button');
+  signupBtnMenu.textContent='Sign Up';
+  signupBtnMenu.onclick=()=>{
+    profileMenu.style.display='none';
+    authContainer.style.display='block';
+    chatContainer.style.display='none';
+    signupBox.style.display='block';
+    loginBox.style.display='none';
+  };
+  profileMenu.appendChild(signupBtnMenu);
+  // Delete Account
+  const delBtn=document.createElement('button');
+  delBtn.textContent='Delete Account';
+  delBtn.onclick=handleDeleteAccount;
+  profileMenu.appendChild(delBtn);
+  // Logout
+  const logBtn=document.createElement('button');
+  logBtn.textContent='Logout';
+  logBtn.onclick=handleLogout;
+  profileMenu.appendChild(logBtn);
+}
+
+function handleLogout(){
+  profileMenu.style.display='none';
+  if(!currentUserId) return;
+  fetch('/api/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUserId})});
+  localStorage.removeItem('currentUserId');
+  currentUserId=null;
+  updateAvatar();
+  authContainer.style.display='block';
+  chatContainer.style.display='none';
+  if(socket) socket.disconnect();
+}
+
+async function handleDeleteAccount(){
+  profileMenu.style.display='none';
+  if(!currentUserId) return;
+  if(!confirm('Are you sure you want to delete your account? This cannot be undone.')) return;
+  const res=await fetch('/api/delete-account',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:currentUserId})});
+  if(res.ok){
+    alert('Account deleted successfully.');
+    localStorage.clear();
+    sessionStorage.clear();
+    currentUserId=null;
+    updateAvatar();
+    authContainer.style.display='block';
+    chatContainer.style.display='none';
+    if(socket) socket.disconnect();
+  }else{
+    const data=await res.json();
+    alert(data.message || 'Failed to delete account.');
+  }
+}
 
 // --- Auto-login if userId exists in localStorage ---
 const storedUserId = localStorage.getItem('currentUserId');
 if (storedUserId) {
   currentUserId = storedUserId;
+  updateAvatar();
   authContainer.style.display = 'none';
   chatContainer.style.display = 'block';
   initSocket();
@@ -89,6 +180,7 @@ loginBtn.onclick = async () => {
     localStorage.setItem('currentUserId', userId); // Store user ID
     authContainer.style.display = 'none';
     chatContainer.style.display = 'block';
+    updateAvatar();
     initSocket();
     fetchUsers();
   } else {
@@ -96,8 +188,8 @@ loginBtn.onclick = async () => {
   }
 };
 
-// Logout
-logoutBtn.onclick = async () => {
+// Logout (guard element may not exist on auth page)
+if (logoutBtn) logoutBtn.onclick = async () => {
   await fetch('/api/logout', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -111,6 +203,26 @@ logoutBtn.onclick = async () => {
   chatContainer.style.display = 'none';
   authContainer.style.display = 'block';
   if (socket) socket.disconnect();
+};
+
+// Delete Account
+if (deleteBtn) deleteBtn.onclick = async () => {
+  if (!currentUserId) return;
+  if (!confirm('Are you sure you want to delete your account? This cannot be undone.')) return;
+  const res = await fetch('/api/delete-account', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId: currentUserId })
+  });
+  if (res.ok) {
+    alert('Account deleted successfully.');
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.reload();
+  } else {
+    const data = await res.json();
+    alert(data.message || 'Failed to delete account.');
+  }
 };
 
 // Fetch users

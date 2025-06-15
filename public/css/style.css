@@ -43,16 +43,80 @@ html, body {
   color: white;
   padding: 15px 20px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
 }
 
 .app-header h1 {
   margin: 0;
   font-size: 1.5em;
+  flex: 1;
 }
 
+.profile-avatar {
+  width: 34px;
+  height: 34px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 10px;
+  text-transform: uppercase;
+}
 
+.profile-avatar:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* Header action buttons */
+.user-actions {
+  display: flex;
+  align-items: center;
+}
+.user-actions button {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 0.85em;
+  padding: 6px 10px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+.user-actions button:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+.profile-menu{
+  position:absolute;
+  right:10px;
+  top:60px;
+  background:#fff;
+  border:1px solid #ddd;
+  border-radius:6px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.15);
+  z-index:100;
+  min-width:140px;
+}
+.profile-menu button{
+  color:#333;
+  width:100%;
+  padding:10px 12px;
+  background:#fff;
+  border:none;
+  text-align:left;
+  cursor:pointer;
+  font-size:0.9em;
+}
+.profile-menu button:hover{background:#f0f0f0;}
+
+@media (max-width: 480px) {
+  .user-actions button {
+    padding: 4px 6px;
+    font-size: 0.75em;
+  }
+}
 
 #user-list-box {
   flex-grow: 1;

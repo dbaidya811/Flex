@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "name": "chandan baidya",
+    "userId": "chandan787",
+    "email": "baidyachandan787@gmail.com",
+    "password": "123456"
+  },
+  {
+    "name": "deep baidya",
+    "userId": "dbaidya811",
+    "email": "dbaidya811@gmail.com",
+    "password": "123456"
+  }
+]
