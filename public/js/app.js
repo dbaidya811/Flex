@@ -308,6 +308,7 @@ function loadHistory(uid, peer) {
 function initSocket() {
   socket = io();
   socket.emit('join', currentUserId);
+  // Text messages
   socket.on('receive_message', ({ from, message, to, time }) => {
     const activeChats = JSON.parse(localStorage.getItem('activeChats') || '[]');
     // Only show alert if there is no active chat window for this sender
@@ -316,6 +317,15 @@ function initSocket() {
     }
     // persist
     saveToHistory({ from, to: currentUserId, message, time: time || Date.now(), type: 'text' });
+  });
+
+  // Voice messages
+  socket.on('receive_voice', ({ from, audioType, dataUrl, id, to, time }) => {
+    const activeChats = JSON.parse(localStorage.getItem('activeChats') || '[]');
+    if (from !== currentUserId && !activeChats.includes(from)) {
+      alert(`New voice message from ${from}`);
+    }
+    saveToHistory({ from, to: currentUserId, audioType, dataUrl, id: id || Date.now().toString(36)+Math.random().toString(36).substr(2,5), time: time || Date.now(), type: 'voice' });
   });
 }
 

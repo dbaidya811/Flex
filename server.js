@@ -8,7 +8,8 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+// Increase buffer size to allow base64 audio payload (~50MB)
+const io = socketIo(server, { maxHttpBufferSize: 5e7 });
 
 const USERS_FILE = path.join(__dirname, 'users.json');
 let onlineUsers = {};
@@ -103,6 +104,18 @@ io.on('connection', (socket) => {
     const imageData = { from, to, image, id: id || Date.now().toString(36)+Math.random().toString(36).substr(2,5), time: new Date() };
     io.to(to).emit('receive_image', imageData);
     io.to(from).emit('receive_image', imageData);
+  });
+
+  // Voice message transfer
+  socket.on('send_voice', ({ to, from, audioType, dataUrl, id }) => {
+    console.log(`[Socket.IO] Voice message from ${from} to ${to}`);
+    const voiceData = { from, to, audioType, dataUrl, id: id || Date.now().toString(36)+Math.random().toString(36).substr(2,5), time: new Date() };
+    io.to(to).emit('receive_voice', voiceData);
+    io.to(from).emit('receive_voice', voiceData);
+  });
+
+  // Generic file transfer (e.g., PDF, docx, etc.)
+  socket.on('send_file', ({ to, from, fileName, fileType, dataUrl, id }) => {
   });
 
   // Generic file transfer (e.g., PDF, docx, etc.)

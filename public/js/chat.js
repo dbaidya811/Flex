@@ -13,6 +13,7 @@ const attachBtn = document.getElementById('attach-btn');
 const fileInput = document.getElementById('file-input');
 const emojiBtn = document.getElementById('emoji-btn');
 const emojiPanel = document.getElementById('emoji-panel');
+const voiceBtn = document.getElementById('voice-btn');
 
 if (!chattingWith) {
   alert('No chat target specified. Please open a chat from the user list.');
@@ -80,6 +81,8 @@ function loadHistory() {
           dataUrl: item.dataUrl,
           image: item.fileType.startsWith('image/') ? item.dataUrl : undefined,
         }, new Date(item.time), item.id);
+      } else if(item.type==='voice'){
+        addMessage(item.from, { audioType:item.audioType, dataUrl:item.dataUrl }, new Date(item.time), item.id);
       }
     });
   } catch {}
@@ -159,6 +162,13 @@ trashZone.addEventListener('drop', e => {
 const socket = io();
 // ---------------------------------
 // Receive delete broadcast
+// receive voice
+socket.on('receive_voice', ({ from, audioType, dataUrl, id, time })=>{
+  if (from === currentUserId) return; // already rendered locally
+  addMessage(from, { audioType, dataUrl }, new Date(time), id);
+  saveToHistory({ from, to: currentUserId, audioType, dataUrl, id, time, type:'voice' });
+});
+
 socket.on('delete_message', ({ ids }) => {
   if (!Array.isArray(ids) || !ids.length) return;
   ids.forEach(id => {
@@ -264,6 +274,61 @@ if(emojiBtn){
 }
 // ========================
 
+/************** VOICE MESSAGE LOGIC **************/
+let mediaRecorder=null;
+let voiceChunks=[];
+let isRecording=false;
+
+async function startVoiceRecording(){
+  if(isRecording) return;
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    mediaRecorder=new MediaRecorder(stream);
+    voiceChunks=[];
+    mediaRecorder.ondataavailable=e=>{if(e.data.size>0) voiceChunks.push(e.data);} ;
+    mediaRecorder.onstop=()=>{
+      if(!voiceChunks.length) return;
+      const blob=new Blob(voiceChunks,{type:mediaRecorder.mimeType||'audio/webm'});
+      const reader=new FileReader();
+      reader.onloadend=()=>{
+        const dataUrl=reader.result;
+        sendVoiceMessage(dataUrl,blob.type);
+      };
+      reader.readAsDataURL(blob);
+    };
+    mediaRecorder.start();
+    isRecording=true;
+    voiceBtn.classList.add('recording');
+    // auto stop after 60s
+    setTimeout(()=>{if(isRecording) stopVoiceRecording();},60000);
+  }catch(err){
+    console.error('Mic access',err);
+    alert('Microphone access denied. Allow permission and try again.');
+  }
+}
+function stopVoiceRecording(){
+  if(!isRecording) return;
+  mediaRecorder.stop();
+  mediaRecorder.stream.getTracks().forEach(t=>t.stop());
+  isRecording=false;
+  voiceBtn.classList.remove('recording');
+}
+function sendVoiceMessage(dataUrl,audioType){
+  if(!currentUserId||!chattingWith) return;
+  const id=Date.now().toString(36)+Math.random().toString(36).substr(2,5);
+  addMessage(currentUserId,{audioType,dataUrl},new Date(),id);
+  const payload={to:chattingWith,from:currentUserId,audioType,dataUrl,id,time:Date.now()};
+  socket.emit('send_voice',payload);
+  saveToHistory({...payload,type:'voice'});
+}
+if(voiceBtn){
+  voiceBtn.addEventListener('mousedown',startVoiceRecording);
+  voiceBtn.addEventListener('touchstart',startVoiceRecording);
+  ['mouseup','mouseleave','touchend','touchcancel'].forEach(ev=>voiceBtn.addEventListener(ev,stopVoiceRecording));
+}
+/*************************************************/
+// ========================
+
 attachBtn.onclick = () => {
   fileInput.click();
 };
@@ -337,6 +402,12 @@ function addMessage(sender, content, time, id = null) {
     link.download = content.fileName;
     link.style.wordBreak = 'break-all';
     contentContainer.appendChild(link);
+  } else if(content && content.dataUrl && content.audioType){
+    const audio = document.createElement('audio');
+    audio.controls = true;
+    audio.src = content.dataUrl;
+    audio.style.maxWidth='250px';
+    contentContainer.appendChild(audio);
   }
 
   const timeSpan = document.createElement('span');
