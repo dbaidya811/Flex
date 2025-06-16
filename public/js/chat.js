@@ -338,39 +338,200 @@ if(voiceBtn){
 /*************************************************/
 // ========================
 
-attachBtn.onclick = () => {
+// File upload handling
+attachBtn.addEventListener('click', () => {
   fileInput.click();
-};
+});
 
-fileInput.onchange = (e) => {
+fileInput.addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = function(event) {
-    const dataUrl = event.target.result; // base64 DataURL
-    const id = Date.now().toString(36)+Math.random().toString(36).substr(2,5);
-    const messageData = {
-      to: chattingWith,
-      from: currentUserId,
-      fileName: file.name,
-      fileType: file.type,
-      dataUrl,
-      id,
-    };
-    // show immediately
-    addMessage(currentUserId, {
-      fileName: file.name,
-      fileType: file.type,
-      dataUrl,
-      image: file.type.startsWith('image/') ? dataUrl : undefined,
-    }, new Date());
-    socket.emit('send_file', messageData);
-    saveToHistory({ ...messageData, type: 'file' });
-  };
-  reader.readAsDataURL(file);
-  fileInput.value = ''; // Reset file input
-};
+  try {
+    const dataUrl = await readFileAsDataURL(file);
+    
+    // If it's an image, show preview first
+    if (file.type.startsWith('image/')) {
+      showImagePreview(dataUrl, file.name, () => {
+        // This function will be called when user confirms sending
+        sendFileMessage(dataUrl, file);
+      });
+    } else {
+      // For non-image files, send directly
+      sendFileMessage(dataUrl, file);
+    }
+  } catch (error) {
+    console.error('Error reading file:', error);
+    alert('Error uploading file. Please try again.');
+  }
+});
+
+// Function to show image preview
+function showImagePreview(dataUrl, fileName, onConfirm) {
+  // Create preview container
+  const previewContainer = document.createElement('div');
+  previewContainer.className = 'image-preview-container';
+  
+  // Create preview content
+  previewContainer.innerHTML = `
+    <div class="image-preview">
+      <img src="${dataUrl}" alt="Preview">
+      <div class="image-preview-info">
+        <div class="image-name">${fileName}</div>
+        <div class="image-preview-buttons">
+          <button class="cancel-btn">Cancel</button>
+          <button class="send-btn">Send</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Add to messages area
+  messagesDiv.appendChild(previewContainer);
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+  // Add event listeners
+  const cancelBtn = previewContainer.querySelector('.cancel-btn');
+  const sendBtn = previewContainer.querySelector('.send-btn');
+
+  cancelBtn.addEventListener('click', () => {
+    previewContainer.remove();
+    fileInput.value = ''; // Reset file input
+  });
+
+  sendBtn.addEventListener('click', () => {
+    previewContainer.remove();
+    onConfirm();
+  });
+}
+
+// Function to send file message
+function sendFileMessage(dataUrl, file) {
+  const id = Date.now().toString(36) + Math.random().toString(36).substr(2,5);
+  
+  // Add message locally
+  addMessage(currentUserId, {
+    fileName: file.name,
+    fileType: file.type,
+    dataUrl: dataUrl,
+    image: file.type.startsWith('image/') ? dataUrl : undefined
+  }, new Date(), id);
+
+  // Send to server
+  socket.emit('send_file', {
+    to: chattingWith,
+    from: currentUserId,
+    fileName: file.name,
+    fileType: file.type,
+    dataUrl: dataUrl,
+    id: id
+  });
+
+  // Save to history
+  saveToHistory({
+    from: currentUserId,
+    to: chattingWith,
+    fileName: file.name,
+    fileType: file.type,
+    dataUrl: dataUrl,
+    id: id,
+    time: new Date().toISOString(),
+    type: 'file'
+  });
+
+  // Clear the input
+  fileInput.value = '';
+}
+
+// Helper function to read file as Data URL
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Update addMessage function to handle file messages
+function addMessage(sender, content, time, id = null) {
+  const messageDiv = document.createElement('div');
+  messageDiv.className = `message ${sender === currentUserId ? 'sent' : 'received'}`;
+  if (id) messageDiv.setAttribute('data-mid', id);
+
+  let messageContent = '';
+  if (typeof content === 'string') {
+    // Text message
+    messageContent = content;
+  } else if (content.fileName) {
+    // File message
+    if (content.image) {
+      // Image file
+      messageContent = `
+        <div class="file-message">
+          <img src="${content.image}" alt="${content.fileName}" style="max-width: 200px; max-height: 200px; border-radius: 8px;">
+          <div class="file-info">${content.fileName}</div>
+        </div>
+      `;
+    } else {
+      // Other file type
+      messageContent = `
+        <div class="file-message">
+          <a href="${content.dataUrl}" download="${content.fileName}" class="file-link">
+            <div class="file-icon">📎</div>
+            <div class="file-info">
+              <div class="file-name">${content.fileName}</div>
+              <div class="file-type">${content.fileType}</div>
+            </div>
+          </a>
+        </div>
+      `;
+    }
+  } else if (content.audioType) {
+    // Voice message
+    messageContent = `
+      <div class="voice-message">
+        <audio controls>
+          <source src="${content.dataUrl}" type="${content.audioType}">
+          Your browser does not support the audio element.
+        </audio>
+      </div>
+    `;
+  }
+
+  messageDiv.innerHTML = `
+    ${messageContent}
+    <span class="message-time">${formatTime(time)}</span>
+    <span class="delete-btn">🗑️</span>
+  `;
+
+  // Add drag functionality
+  messageDiv.draggable = true;
+  messageDiv.addEventListener('dragstart', () => {
+    selectedIds.add(id);
+    updateTrashState();
+  });
+  messageDiv.addEventListener('dragend', () => {
+    selectedIds.delete(id);
+    updateTrashState();
+  });
+
+  // Add click to select
+  messageDiv.addEventListener('click', () => {
+    if (selectedIds.size > 0) {
+      messageDiv.classList.toggle('selected');
+      if (messageDiv.classList.contains('selected')) {
+        selectedIds.add(id);
+      } else {
+        selectedIds.delete(id);
+      }
+      updateTrashState();
+    }
+  });
+
+  messagesDiv.appendChild(messageDiv);
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
 
 function formatTime(date) {
   if (!date || isNaN(date)) {
@@ -383,89 +544,4 @@ function formatTime(date) {
   h = h ? h : 12; // The hour '0' should be '12'
   m = m < 10 ? '0' + m : m;
   return h + ':' + m + ' ' + ampm;
-}
-
-function addMessage(sender, content, time, id = null) {
-  const div = document.createElement('div');
-  if (!id) id = Date.now().toString(36) + Math.random().toString(36).substr(2,5);
-  div.dataset.mid = id;
-  div.classList.add('message');
-
-  const contentContainer = document.createElement('div');
-
-  if (typeof content === 'string') {
-    contentContainer.textContent = content;
-  } else if (content && content.image) {
-    const img = document.createElement('img');
-    img.src = content.image;
-    img.style.maxWidth = '100%';
-    img.style.borderRadius = '15px';
-    img.style.display = 'block';
-    contentContainer.appendChild(img);
-    div.style.padding = '5px';
-  } else if (content && content.fileName) {
-    // Generic file – provide download link
-    const link = document.createElement('a');
-    link.href = content.dataUrl;
-    link.textContent = `📄 ${content.fileName}`;
-    link.download = content.fileName;
-    link.style.wordBreak = 'break-all';
-    contentContainer.appendChild(link);
-  } else if(content && content.dataUrl && content.audioType){
-    const audio = document.createElement('audio');
-    audio.controls = true;
-    audio.src = content.dataUrl;
-    audio.style.maxWidth='250px';
-    contentContainer.appendChild(audio);
-  }
-
-  const timeSpan = document.createElement('span');
-  timeSpan.className = 'message-time';
-  timeSpan.textContent = formatTime(time);
-
-  if (sender === currentUserId) {
-    div.classList.add('sent');
-  } else {
-    div.classList.add('received');
-  }
-
-  div.appendChild(contentContainer);
-  // inline delete button
-  const delBtn = document.createElement('span');
-  delBtn.className = 'delete-btn';
-  delBtn.innerHTML = '🗑️';
-  delBtn.title = 'Delete message';
-  delBtn.onclick = (e) => {
-    e.stopPropagation();
-    performDelete([div.dataset.mid]);
-  };
-  div.appendChild(timeSpan);
-  div.appendChild(delBtn);
-  // double-click select / drag enable
-  div.ondblclick = () => {
-    // toggle selection
-    if (div.classList.contains('selected')) {
-      div.classList.remove('selected');
-      selectedIds.delete(div.dataset.mid);
-      div.draggable = false;
-    } else {
-      div.classList.add('selected');
-      selectedIds.add(div.dataset.mid);
-      div.draggable = true;
-    }
-    updateTrashState();
-  };
-  // drag handlers
-  div.addEventListener('dragstart', () => {
-    if (!div.classList.contains('selected')) {
-      // ensure only selected items drag
-      div.classList.add('selected');
-      selectedIds.add(div.dataset.mid);
-      updateTrashState();
-    }
-    div.classList.add('dragging');
-  });
-  div.addEventListener('dragend', () => div.classList.remove('dragging'));
-  messagesDiv.appendChild(div);
-  messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
