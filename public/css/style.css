@@ -459,7 +459,9 @@ button:hover { background: #0056b3; }
 /* Responsive Design */
 @media (max-width: 600px) {
   #auth-container, #chat-container {
+    width: 100vw;
     max-width: 100vw;
+    height: 100vh;
     padding: 0;
     border-radius: 0;
   }
@@ -468,8 +470,13 @@ button:hover { background: #0056b3; }
     font-size: 1.1em;
   }
   #signup-box, #login-box {
-    padding: 12px 2vw 10px 2vw;
+    width: 90vw;
+    max-width: 90vw;
+    padding: 12px 4vw 10px 4vw;
+    margin: 0 auto; /* center horizontally */
   }
+  /* Hide big welcome header on small screens */
+  .auth-header { display: none; }
   #messages {
     padding: 8px 2px;
     min-height: 120px;

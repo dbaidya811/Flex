@@ -14,6 +14,7 @@ const fileInput = document.getElementById('file-input');
 const emojiBtn = document.getElementById('emoji-btn');
 const emojiPanel = document.getElementById('emoji-panel');
 const voiceBtn = document.getElementById('voice-btn');
+const moreBtn = document.getElementById('more-btn');
 
 if (!chattingWith) {
   alert('No chat target specified. Please open a chat from the user list.');
@@ -53,6 +54,14 @@ window.addEventListener('beforeunload', () => {
   }
 });
 // -------------------------- //
+
+/************** MOBILE TOOLBAR TOGGLE **************/
+if (moreBtn) {
+  moreBtn.addEventListener('click', () => {
+    chatForm.classList.toggle('show-tools');
+  });
+}
+/***************************************************/
 
 // === Local chat history persistence ===
 function historyKey() {
@@ -421,7 +430,17 @@ function addMessage(sender, content, time, id = null) {
   }
 
   div.appendChild(contentContainer);
+  // inline delete button
+  const delBtn = document.createElement('span');
+  delBtn.className = 'delete-btn';
+  delBtn.innerHTML = '🗑️';
+  delBtn.title = 'Delete message';
+  delBtn.onclick = (e) => {
+    e.stopPropagation();
+    performDelete([div.dataset.mid]);
+  };
   div.appendChild(timeSpan);
+  div.appendChild(delBtn);
   // double-click select / drag enable
   div.ondblclick = () => {
     // toggle selection
