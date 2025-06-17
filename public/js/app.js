@@ -2,7 +2,58 @@ let socket = null;
 let currentUserId = null;
 let chattingWith = null;
 
+// ---------------- Push Notification (Web Push) ----------------
+// Replace with your own generated VAPID public key (Base64-url string)
+const PUBLIC_VAPID_KEY = 'REPLACE_WITH_YOUR_PUBLIC_VAPID_KEY';
+
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g,'+').replace(/_/g,'/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for(let i=0;i<rawData.length;++i){outputArray[i]=rawData.charCodeAt(i);}return outputArray;
+}
+
+async function registerPush(){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window) || !currentUserId) return;
+  try{
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub){
+      sub = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:urlBase64ToUint8Array(PUBLIC_VAPID_KEY)});
+    }
+    await fetch('/api/save-sub', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({userId: currentUserId, sub})});
+  }catch(err){console.warn('[push] setup failed', err);}
+}
+// ----------------------------------------------------------------
+
 // UI Elements
+// ---------------- Socket helper ----------------
+function initSocket(){
+  if(socket || !currentUserId) return;
+  socket = io();
+  // join personal signalling room
+  socket.emit('join', currentUserId);
+  console.log('[socket] joined personal room', currentUserId);
+  // Auto-open chat tab on incoming VIDEO call
+  socket.on('incoming_video', ({from, offer})=>{
+    try { sessionStorage.setItem('pendingVideoOffer', JSON.stringify({from, offer})); } catch{}
+    const popup = window.open(`chat.html?userId=${from}`, '_blank');
+    if(!popup){
+      alert(`${from} is video calling you ‑ open their chat to answer.`);
+    }
+  });
+  // Auto-open chat tab on incoming VOICE call (optional)
+  socket.on('incoming_call', ({from, offer})=>{
+    try { sessionStorage.setItem('pendingVoiceOffer', JSON.stringify({from, offer})); } catch{}
+    const popup = window.open(`chat.html?userId=${from}`, '_blank');
+    if(!popup){
+      alert(`${from} is calling you ‑ open their chat to answer.`);
+    }
+  });
+}
+// -------------------------------------------------
+
 const signupBox = document.getElementById('signup-box');
 const loginBox = document.getElementById('login-box');
 const showLogin = document.getElementById('show-login');
@@ -119,6 +170,7 @@ if (storedUserId) {
   authContainer.style.display = 'none';
   chatContainer.style.display = 'block';
   initSocket();
+  registerPush();
   fetchUsers();
 }
 // --------------------------------------------------
@@ -157,6 +209,7 @@ signupBtn.onclick = async () => {
     chatContainer.style.display = 'block';
     updateAvatar();
     initSocket();
+  registerPush();
     fetchUsers();
   } else {
     signupError.textContent = data.message || 'Signup failed.';
@@ -186,6 +239,7 @@ loginBtn.onclick = async () => {
     chatContainer.style.display = 'block';
     updateAvatar();
     initSocket();
+  registerPush();
     fetchUsers();
   } else {
     loginError.textContent = data.message || 'Login failed.';

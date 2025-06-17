@@ -312,6 +312,24 @@ body {
   color:var(--primary-color);
 }
 #call-btn:hover{color:#5a48e3;}
+#video-btn{
+  position:absolute;
+  right:70px; /* slightly left of voice button */
+  background:none;
+  border:none;
+  cursor:pointer;
+  font-size:24px;
+  color:var(--primary-color);
+}
+#video-btn:hover{color:#5a48e3;}
+
+.video-overlay{
+  position:fixed;inset:0;display:flex;justify-content:center;align-items:center;background:rgba(0,0,0,0.9);flex-direction:column;z-index:3000;
+}
+.video-overlay video.remote{width:90%;max-width:480px;border-radius:12px;}
+.video-overlay video.local{position:absolute;bottom:20px;right:20px;width:120px;border-radius:8px;box-shadow:0 0 6px rgba(0,0,0,0.4);}
+.video-overlay .end-video{position:absolute;top:20px;right:20px;font-size:28px;background:#e74c3c;color:#fff;border:none;border-radius:50%;width:48px;height:48px;cursor:pointer;}
+@media(max-width:600px){.video-overlay video.local{width:80px;bottom:12px;right:12px;}}
 
 /* --- Responsive Design --- */
 .delete-btn{display:none;cursor:pointer;font-size:18px;margin-left:6px;user-select:none;}

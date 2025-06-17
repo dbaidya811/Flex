@@ -15,9 +15,10 @@
         <span class="chat-header-name" id="chat-header-name">Name</span><br>
         <span class="chat-header-id" id="chat-header-id">@userid</span>
       </div>
-      <button id="call-btn" class="icon-btn" title="Voice Call" style="margin-left:auto; font-size:24px;">
+      <button id="call-btn" class="icon-btn" title="Voice Call">
         📞
       </button>
+      <button id="video-btn" class="icon-btn" title="Video Call">🎥</button>
     </div>
     <div id="messages"></div>
     <form id="chat-form">
@@ -35,6 +36,11 @@
       </button>
     </form>
     <audio id="remote-audio" autoplay></audio>
+    <div id="video-overlay" class="video-overlay" style="display:none;">
+      <video id="remote-video" autoplay playsinline class="remote"></video>
+      <video id="local-video" autoplay muted playsinline class="local"></video>
+      <button id="end-video-btn" class="end-video">✖</button>
+    </div>
   </div>
   <script src="/socket.io/socket.io.js"></script>
   <script src="js/chat.js"></script>

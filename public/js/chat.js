@@ -16,10 +16,22 @@ const emojiPanel = document.getElementById('emoji-panel');
 const voiceBtn = document.getElementById('voice-btn');
 const moreBtn = document.getElementById('more-btn');
 const callBtn = document.getElementById('call-btn');
+const videoBtn = document.getElementById('video-btn');
+const videoOverlay = document.getElementById('video-overlay');
+const remoteVideo = document.getElementById('remote-video');
+const localVideo = document.getElementById('local-video');
+const endVideoBtn = document.getElementById('end-video-btn');
+let videoPeer = null;
+let videoStream = null;
 const remoteAudio = document.getElementById('remote-audio');
 let localStream = null;
 let peerConnection = null;
-const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+const rtcConfig = { iceServers: [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'turn:openrelay.metered.ca:80',   username:'openrelayproject', credential:'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443',  username:'openrelayproject', credential:'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username:'openrelayproject', credential:'openrelayproject' }
+] };
 
 if (!chattingWith) {
   alert('No chat target specified. Please open a chat from the user list.');
@@ -288,6 +300,21 @@ trashZone.addEventListener('drop', e => {
 // ---------------------------------
 // Initialise socket immediately
 const socket = io();
+// Join personal room for private or media signaling
+socket.emit('join', currentUserId);
+console.log('[Socket] joined room', currentUserId);
+// If this tab was auto-opened due to an incoming video call
+(function(){
+  const pending = sessionStorage.getItem('pendingVideoOffer');
+  if(!pending) return;
+  try {
+    const {from, offer} = JSON.parse(pending);
+    if(from === chattingWith && offer){
+      handleVideoOffer(from, offer);
+    }
+  } catch{}
+  sessionStorage.removeItem('pendingVideoOffer');
+})();
 
 /********** Voice Call logic ***********/
 async function initLocalStream() {
@@ -323,6 +350,7 @@ async function startCall() {
   };
   peerConnection.ontrack = e => {
     if (remoteAudio) remoteAudio.srcObject = e.streams[0];
+        remoteAudio.play().catch(()=>{});
   };
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
@@ -338,6 +366,7 @@ async function handleIncomingOffer(from, offer) {
   };
   peerConnection.ontrack = e => {
     if (remoteAudio) remoteAudio.srcObject = e.streams[0];
+        remoteAudio.play().catch(()=>{});
   };
   await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
   const answer = await peerConnection.createAnswer();
@@ -392,6 +421,75 @@ socket.on('call_ended', () => {
   closePeerConnection();
   callBtn.textContent = '📞';
 });
+/****************************************/
+/********** Video Call logic ***********/
+async function initVideoStream(){
+  if(videoStream) return videoStream;
+  videoStream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+  localVideo.srcObject = videoStream;
+  localVideo.play().catch(()=>{});
+  return videoStream;
+}
+function closeVideoPeer(){
+  if(videoBtn) videoBtn.textContent='🎥';
+  if(videoPeer){videoPeer.close();videoPeer=null;}
+  if(videoOverlay) videoOverlay.style.display='none';
+  remoteVideo.srcObject=null;
+}
+async function startVideoCall(){
+  if(!chattingWith) return;
+  await initVideoStream();
+  videoPeer = new RTCPeerConnection(rtcConfig);
+  videoStream.getTracks().forEach(t=>videoPeer.addTrack(t,videoStream));
+  videoPeer.onicecandidate=e=>{if(e.candidate) socket.emit('video_signal',{to:chattingWith,from:currentUserId,data:{candidate:e.candidate}});};
+  videoPeer.ontrack=e=>{remoteVideo.srcObject=e.streams[0];
+        remoteVideo.play().catch(()=>{});};
+  const offer=await videoPeer.createOffer();
+  await videoPeer.setLocalDescription(offer);
+  console.log('emit video_call to', chattingWith);
+socket.emit('video_call',{to:chattingWith,from:currentUserId,offer});
+  videoOverlay.style.display='flex';
+}
+async function handleVideoOffer(from,offer){
+  await initVideoStream();
+  videoPeer = new RTCPeerConnection(rtcConfig);
+  videoStream.getTracks().forEach(t=>videoPeer.addTrack(t,videoStream));
+  videoPeer.onicecandidate=e=>{if(e.candidate) socket.emit('video_signal',{to:from,from:currentUserId,data:{candidate:e.candidate}});};
+  videoPeer.ontrack=e=>{remoteVideo.srcObject=e.streams[0];
+        remoteVideo.play().catch(()=>{});};
+  await videoPeer.setRemoteDescription(new RTCSessionDescription(offer));
+  const answer=await videoPeer.createAnswer();
+  await videoPeer.setLocalDescription(answer);
+  socket.emit('video_signal',{to:from,from:currentUserId,data:{answer}});
+  videoOverlay.style.display='flex';
+}
+async function handleVideoAnswer(answer){if(videoPeer) await videoPeer.setRemoteDescription(new RTCSessionDescription(answer));}
+function handleVideoCandidate(c){if(videoPeer) videoPeer.addIceCandidate(new RTCIceCandidate(c));}
+if(videoBtn){videoBtn.addEventListener('click',()=>{
+  if(videoPeer){
+    socket.emit('video_end',{to:chattingWith,from:currentUserId});
+    closeVideoPeer();
+    videoBtn.textContent='🎥';
+  } else {
+    startVideoCall();
+  }
+});}
+if(endVideoBtn){endVideoBtn.addEventListener('click',()=>{socket.emit('video_end',{to:chattingWith,from:currentUserId});closeVideoPeer();});}
+// socket listeners
+socket.on('incoming_video',async({from,offer})=>{
+  console.log('incoming_video from', from);
+  if(confirm(`${from} is video calling. Accept?`)){
+    handleVideoOffer(from,offer);
+  } else {
+    socket.emit('video_end',{to:from,from:currentUserId});
+  }
+});
+socket.on('video_signal',({from,data})=>{
+  console.log('video_signal from', from, data);
+  if(data.answer) handleVideoAnswer(data.answer); else if(data.candidate) handleVideoCandidate(data.candidate);
+});
+socket.on('video_ended',()=>{alert('Video call ended');closeVideoPeer();});
+/********** End Video ***********/
 /****************************************/ 
 // ---------------------------------
 // Receive delete broadcast
