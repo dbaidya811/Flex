@@ -135,6 +135,21 @@ io.on('connection', (socket) => {
     io.to(from).emit('delete_message', { ids });
   });
 
+  // Voice call signaling
+  socket.on('call_user', ({ to, from, offer }) => {
+    console.log(`[Socket.IO] ${from} is calling ${to}`);
+    io.to(to).emit('incoming_call', { from, offer });
+  });
+
+  socket.on('call_signal', ({ to, from, data }) => {
+    io.to(to).emit('call_signal', { from, data });
+  });
+
+  socket.on('end_call', ({ to, from }) => {
+    io.to(to).emit('call_ended');
+    io.to(from).emit('call_ended');
+  });
+
   socket.on('disconnect', () => {
     if (currentUser) {
       // Optional: log disconnection

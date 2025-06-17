@@ -2,6 +2,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
 
 :root {
+  --dummy: 0;
+}
+
+/* Ensure chat container spans full viewport, overriding global style */
+#chat-container{
+  max-width:none !important;
+  margin:0;
+}
+
+:root {
   --primary-color: #6a5af9;
   --secondary-color: #f2f2f7;
   --sent-bg: linear-gradient(135deg, #6a5af9 0%, #d66bff 100%);
@@ -291,6 +301,17 @@ body {
 .message.fade-out {
   animation: fadeSlide 0.3s forwards;
 }
+
+#call-btn{
+  position:absolute;
+  right:22px;
+  background:none;
+  border:none;
+  cursor:pointer;
+  font-size:24px;
+  color:var(--primary-color);
+}
+#call-btn:hover{color:#5a48e3;}
 
 /* --- Responsive Design --- */
 .delete-btn{display:none;cursor:pointer;font-size:18px;margin-left:6px;user-select:none;}

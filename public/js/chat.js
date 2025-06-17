@@ -15,6 +15,11 @@ const emojiBtn = document.getElementById('emoji-btn');
 const emojiPanel = document.getElementById('emoji-panel');
 const voiceBtn = document.getElementById('voice-btn');
 const moreBtn = document.getElementById('more-btn');
+const callBtn = document.getElementById('call-btn');
+const remoteAudio = document.getElementById('remote-audio');
+let localStream = null;
+let peerConnection = null;
+const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
 if (!chattingWith) {
   alert('No chat target specified. Please open a chat from the user list.');
@@ -231,27 +236,40 @@ function showContextMenu(ev, mid, copyText, isSent){
   },{passive:false});
   // delegation
   messagesDiv.addEventListener('click', (e)=>{
-    const target=e.target;
-    if(target.classList.contains('chat-media')){
-      const src=target.src || target.currentSrc;
-      overlay.innerHTML='';
-      let elem;
-      if(target.dataset.type==='image'){
-        elem=document.createElement('img');
-        elem.src=src;
-        elem.style='max-width:90vw;max-height:90vh;cursor:zoom-in;transition:transform 0.2s ease;';
-      }else{
-        elem=document.createElement('video');
-        elem.src=src;
-        elem.controls=true;
-        elem.style='max-width:90vw;max-height:90vh;';
-      }
-      elem.className='viewer-media';
-      overlay.appendChild(elem);
-      overlay.style.display='flex';
-      currentScale=1;
-      e.stopPropagation();
+    const target = e.target;
+    if(!target.classList.contains('chat-media')) return;
+    const messageDiv = target.closest('.message');
+    if(!messageDiv) return;
+    const mid = messageDiv.getAttribute('data-mid');
+    const isSent = messageDiv.classList.contains('sent');
+
+    // If double-click (detail===2) show context menu instead of fullscreen preview
+    if(e.detail === 2){
+      e.preventDefault();
+      const copyText = target.getAttribute('alt') || '';
+      showContextMenu(e, mid, copyText, isSent);
+      return;
     }
+
+    // Single click – show fullscreen preview
+    const src = target.src || target.currentSrc;
+    overlay.innerHTML='';
+    let elem;
+    if(target.dataset.type==='image'){
+      elem=document.createElement('img');
+      elem.src=src;
+      elem.style='max-width:90vw;max-height:90vh;cursor:zoom-in;transition:transform 0.2s ease;';
+    }else{
+      elem=document.createElement('video');
+      elem.src=src;
+      elem.controls=true;
+      elem.style='max-width:90vw;max-height:90vh;';
+    }
+    elem.className='viewer-media';
+    overlay.appendChild(elem);
+    overlay.style.display='flex';
+    currentScale=1;
+    e.stopPropagation();
   });
 })();
 // ====================================
@@ -270,6 +288,111 @@ trashZone.addEventListener('drop', e => {
 // ---------------------------------
 // Initialise socket immediately
 const socket = io();
+
+/********** Voice Call logic ***********/
+async function initLocalStream() {
+  if (localStream) return localStream;
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    return localStream;
+  } catch (err) {
+    alert('Microphone permission denied');
+    throw err;
+  }
+}
+
+function closePeerConnection() {
+  if (peerConnection) {
+    peerConnection.close();
+    peerConnection = null;
+  }
+  if (remoteAudio) {
+    remoteAudio.srcObject = null;
+  }
+}
+
+async function startCall() {
+  if (!chattingWith) return;
+  await initLocalStream();
+  peerConnection = new RTCPeerConnection(rtcConfig);
+  localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+  peerConnection.onicecandidate = e => {
+    if (e.candidate) {
+      socket.emit('call_signal', { to: chattingWith, from: currentUserId, data: { candidate: e.candidate } });
+    }
+  };
+  peerConnection.ontrack = e => {
+    if (remoteAudio) remoteAudio.srcObject = e.streams[0];
+  };
+  const offer = await peerConnection.createOffer();
+  await peerConnection.setLocalDescription(offer);
+  socket.emit('call_user', { to: chattingWith, from: currentUserId, offer });
+}
+
+async function handleIncomingOffer(from, offer) {
+  await initLocalStream();
+  peerConnection = new RTCPeerConnection(rtcConfig);
+  localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+  peerConnection.onicecandidate = e => {
+    if (e.candidate) socket.emit('call_signal', { to: from, from: currentUserId, data: { candidate: e.candidate } });
+  };
+  peerConnection.ontrack = e => {
+    if (remoteAudio) remoteAudio.srcObject = e.streams[0];
+  };
+  await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+  const answer = await peerConnection.createAnswer();
+  await peerConnection.setLocalDescription(answer);
+  socket.emit('call_signal', { to: from, from: currentUserId, data: { answer } });
+}
+
+async function handleAnswer(answer) {
+  if (!peerConnection) return;
+  await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+}
+
+function handleCandidate(candidate) {
+  if (peerConnection) peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+}
+
+if (callBtn) {
+  callBtn.addEventListener('click', async () => {
+    if (peerConnection) {
+      // already in call, end it
+      socket.emit('end_call', { to: chattingWith, from: currentUserId });
+      closePeerConnection();
+      callBtn.textContent = '📞';
+    } else {
+      callBtn.textContent = '🔴';
+      startCall();
+    }
+  });
+}
+
+// Socket listeners for call
+socket.on('incoming_call', async ({ from, offer }) => {
+  const accept = confirm(`${from} is calling. Accept?`);
+  if (!accept) {
+    socket.emit('end_call', { to: from, from: currentUserId });
+    return;
+  }
+  callBtn.textContent = '🔴';
+  await handleIncomingOffer(from, offer);
+});
+
+socket.on('call_signal', async ({ from, data }) => {
+  if (data.answer) {
+    await handleAnswer(data.answer);
+  } else if (data.candidate) {
+    handleCandidate(data.candidate);
+  }
+});
+
+socket.on('call_ended', () => {
+  alert('Call ended');
+  closePeerConnection();
+  callBtn.textContent = '📞';
+});
+/****************************************/ 
 // ---------------------------------
 // Receive delete broadcast
 // receive voice
@@ -343,14 +466,14 @@ socket.on('receive_message', ({ from, to, message, time, id }) => {
     saveToHistory({ from, to, message, time, id, type: 'text' });
   }
 });
-
-// Receive file (image/pdf/etc.)
 socket.on('receive_file', ({ from, to, fileName, fileType, dataUrl, time }) => {
   if (from === currentUserId) return; // already rendered locally
   const isChatting = (to === chattingWith && from === currentUserId) || (to === currentUserId && from === chattingWith);
   if (isChatting) {
-    addMessage(from, { fileName, fileType, dataUrl }, new Date(time));
-    saveToHistory({ from, to, fileName, fileType, dataUrl, time, type: 'file' });
+    const imageFlag = fileType && fileType.startsWith('image/') ? dataUrl : undefined;
+    const videoFlag = fileType && fileType.startsWith('video/') ? dataUrl : undefined;
+    addMessage(from, { fileName, fileType, dataUrl, image: imageFlag, video: videoFlag }, new Date(time));
+    saveToHistory({ from, to, fileName, fileType, dataUrl, image: imageFlag, video: videoFlag, time, type: 'file' });
   }
 });
 
