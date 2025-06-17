@@ -89,6 +89,7 @@ function loadHistory() {
           fileType: item.fileType,
           dataUrl: item.dataUrl,
           image: item.fileType.startsWith('image/') ? item.dataUrl : undefined,
+          video: item.fileType.startsWith('video/') ? item.dataUrl : undefined,
         }, new Date(item.time), item.id);
       } else if(item.type==='voice'){
         addMessage(item.from, { audioType:item.audioType, dataUrl:item.dataUrl }, new Date(item.time), item.id);
@@ -154,6 +155,106 @@ function performDelete(ids) {
   selectedIds.clear();
   updateTrashState();
 }
+
+// ---- Local delete (no broadcast) ----
+function performLocalDelete(ids){
+  if(!ids.length) return;
+  ids.forEach(id=>{
+    const el=document.querySelector(`[data-mid="${id}"]`);
+    if(el){el.classList.add('fade-out');setTimeout(()=>el.remove(),300);} });
+  const delKey=deletedKey();
+  const deletedArr=JSON.parse(localStorage.getItem(delKey)||'[]');
+  ids.forEach(id=>{ if(!deletedArr.includes(id)) deletedArr.push(id); });
+  localStorage.setItem(delKey, JSON.stringify(deletedArr));
+  let history=[];
+  try{history=JSON.parse(localStorage.getItem(historyKey()))||[];}catch{}
+  history=history.filter(m=>!ids.includes(m.id));
+  localStorage.setItem(historyKey(), JSON.stringify(history));
+  selectedIds.clear();
+  updateTrashState();
+}
+// ---- Context menu ----
+function showContextMenu(ev, mid, copyText, isSent){
+  ev.preventDefault();
+  document.querySelectorAll('.msg-context-menu').forEach(m=>m.remove());
+  if(!document.getElementById('ctx-style')){
+    const style=document.createElement('style');
+    style.id='ctx-style';
+    style.textContent=`.msg-context-menu{position:fixed;background:#fff;border:1px solid #ddd;border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,0.15);z-index:1000;} .msg-context-menu button{display:block;width:100%;padding:6px 10px;border:none;background:none;text-align:left;cursor:pointer;font-size:14px;} .msg-context-menu button:hover{background:#f0f0f0;}`;
+    document.head.appendChild(style);
+  }
+  const menu=document.createElement('div');
+  menu.className='msg-context-menu';
+  menu.style.top=ev.clientY+'px';
+  // Default anchor at click point then adjust after insertion
+  menu.style.left=ev.clientX+'px';
+  const copyBtn=document.createElement('button');
+  copyBtn.textContent='Copy';
+  copyBtn.onclick=()=>{ if(copyText) navigator.clipboard.writeText(copyText); menu.remove(); };
+  const delBtn=document.createElement('button');
+  delBtn.textContent='Delete';
+  delBtn.onclick=()=>{ performLocalDelete([mid]); menu.remove(); };
+  const delAllBtn=document.createElement('button');
+  delAllBtn.textContent='Delete for All';
+  delAllBtn.onclick=()=>{ performDelete([mid]); menu.remove(); };
+  [copyBtn, delBtn, delAllBtn].forEach(b=>menu.appendChild(b));
+  document.body.appendChild(menu);
+  // After added, reposition horizontally opposite of message side
+  const rect = menu.getBoundingClientRect();
+  if(isSent){
+    // message on right, place menu left of click so it points inward
+    menu.style.left = (ev.clientX - rect.width - 8) + 'px';
+  }else{
+    // message on left, place menu right of click
+    menu.style.left = (ev.clientX + 8) + 'px';
+  }
+  setTimeout(()=>{document.addEventListener('click', ()=>menu.remove(), { once:true});},0);
+}
+
+// ===== Full-screen media viewer =====
+(function initMediaViewer(){
+  if(document.getElementById('media-viewer-overlay')) return;
+  const overlay=document.createElement('div');
+  overlay.id='media-viewer-overlay';
+  overlay.style='position:fixed;inset:0;display:none;justify-content:center;align-items:center;background:rgba(0,0,0,0.8);z-index:2000;';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click',()=>{overlay.style.display='none';overlay.innerHTML='';currentScale=1;});
+  let currentScale=1;
+  function setZoom(el,delta){
+    currentScale=Math.min(5,Math.max(1,currentScale+(delta>0?-0.1:0.1)));
+    el.style.transform=`scale(${currentScale})`;
+  }
+  overlay.addEventListener('wheel',e=>{
+    const media=overlay.querySelector('.viewer-media');
+    if(media) setZoom(media,e.deltaY);
+    e.preventDefault();
+  },{passive:false});
+  // delegation
+  messagesDiv.addEventListener('click', (e)=>{
+    const target=e.target;
+    if(target.classList.contains('chat-media')){
+      const src=target.src || target.currentSrc;
+      overlay.innerHTML='';
+      let elem;
+      if(target.dataset.type==='image'){
+        elem=document.createElement('img');
+        elem.src=src;
+        elem.style='max-width:90vw;max-height:90vh;cursor:zoom-in;transition:transform 0.2s ease;';
+      }else{
+        elem=document.createElement('video');
+        elem.src=src;
+        elem.controls=true;
+        elem.style='max-width:90vw;max-height:90vh;';
+      }
+      elem.className='viewer-media';
+      overlay.appendChild(elem);
+      overlay.style.display='flex';
+      currentScale=1;
+      e.stopPropagation();
+    }
+  });
+})();
+// ====================================
 
 // drag events for trashZone
 trashZone.addEventListener('dragover', e => { e.preventDefault(); trashZone.classList.add('drag-over'); });
@@ -375,7 +476,7 @@ function showImagePreview(dataUrl, fileName, onConfirm) {
   // Create preview content
   previewContainer.innerHTML = `
     <div class="image-preview">
-      <img src="${dataUrl}" alt="Preview">
+      <img class="chat-media" data-type="image" src="${dataUrl}" alt="Preview">
       <div class="image-preview-info">
         <div class="image-name">${fileName}</div>
         <div class="image-preview-buttons">
@@ -414,7 +515,8 @@ function sendFileMessage(dataUrl, file) {
     fileName: file.name,
     fileType: file.type,
     dataUrl: dataUrl,
-    image: file.type.startsWith('image/') ? dataUrl : undefined
+    image: file.type.startsWith('image/') ? dataUrl : undefined,
+    video: file.type.startsWith('video/') ? dataUrl : undefined
   }, new Date(), id);
 
   // Send to server
@@ -436,6 +538,7 @@ function sendFileMessage(dataUrl, file) {
     dataUrl: dataUrl,
     id: id,
     time: new Date().toISOString(),
+    video: file.type.startsWith('video/') ? dataUrl : undefined,
     type: 'file'
   });
 
@@ -469,7 +572,19 @@ function addMessage(sender, content, time, id = null) {
       // Image file
       messageContent = `
         <div class="file-message">
-          <img src="${content.image}" alt="${content.fileName}" style="max-width: 200px; max-height: 200px; border-radius: 8px;">
+          <img class="chat-media" data-type="image" src="${content.image}" alt="${content.fileName}" style="max-width: 200px; max-height: 200px; border-radius: 8px;">
+          <div class="file-info">${content.fileName}</div>
+        </div>
+      `;
+    } else if (content.video || (content.fileType && content.fileType.startsWith('video/'))) {
+      // Video file
+      const videoSrc = content.video || content.dataUrl;
+      messageContent = `
+        <div class="file-message">
+          <video class="chat-media" data-type="video" controls style="max-width: 240px; max-height: 200px; border-radius: 8px;">
+            <source src="${videoSrc}" type="${content.fileType || 'video/mp4'}">
+            Your browser does not support the video tag.
+          </video>
           <div class="file-info">${content.fileName}</div>
         </div>
       `;
@@ -514,6 +629,14 @@ function addMessage(sender, content, time, id = null) {
   messageDiv.addEventListener('dragend', () => {
     selectedIds.delete(id);
     updateTrashState();
+  });
+
+  // Double-click context menu
+  messageDiv.addEventListener('dblclick', (ev) => {
+    if(!id) return;
+    const copyText = typeof content === 'string' ? content : (content.fileName ? content.fileName : '');
+    const isSent = messageDiv.classList.contains('sent');
+    showContextMenu(ev, id, copyText, isSent);
   });
 
   // Add click to select

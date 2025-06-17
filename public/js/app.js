@@ -151,9 +151,13 @@ signupBtn.onclick = async () => {
   const data = await res.json();
   if (res.ok) {
     signupError.textContent = '';
-    alert('Signup successful! Please login.');
-    signupBox.style.display = 'none';
-    loginBox.style.display = 'block';
+    currentUserId = userId;
+    localStorage.setItem('currentUserId', userId);
+    authContainer.style.display = 'none';
+    chatContainer.style.display = 'block';
+    updateAvatar();
+    initSocket();
+    fetchUsers();
   } else {
     signupError.textContent = data.message || 'Signup failed.';
   }

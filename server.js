@@ -37,7 +37,9 @@ app.post('/api/signup', (req, res) => {
   }
   users.push({ name, userId, email, password });
   writeUsers(users);
-  res.json({ message: 'Signup successful' });
+  // Auto-login: mark this user as online immediately after successful signup
+  onlineUsers[userId] = true;
+  res.json({ message: 'Signup successful', userId });
 });
 
 // Login endpoint
