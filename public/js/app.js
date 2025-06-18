@@ -45,10 +45,12 @@ function initSocket(){
   });
   // Auto-open chat tab on incoming VOICE call (optional)
   socket.on('incoming_call', ({from, offer})=>{
+    console.log('DEBUG - App.js incoming call from:', from);
     try { sessionStorage.setItem('pendingVoiceOffer', JSON.stringify({from, offer})); } catch{}
     const popup = window.open(`chat.html?userId=${from}`, '_blank');
     if(!popup){
-      alert(`${from} is calling you ‑ open their chat to answer.`);
+      const callerId = from; // Explicitly use the caller's ID
+      alert(`${callerId} is calling you - open their chat to answer.`);
     }
   });
 }
@@ -103,8 +105,8 @@ function buildProfileMenu(){
     profileMenu.style.display='none';
     authContainer.style.display='block';
     chatContainer.style.display='none';
-    loginBox.style.display='block';
-    signupBox.style.display='none';
+    signupBox.style.display='block';
+    loginBox.style.display='none';
   };
   profileMenu.appendChild(loginBtn);
   // Sign up
@@ -139,6 +141,8 @@ function handleLogout(){
   updateAvatar();
   authContainer.style.display='block';
   chatContainer.style.display='none';
+  signupBox.style.display='block';
+  loginBox.style.display='none';
   if(socket) socket.disconnect();
 }
 
@@ -155,6 +159,8 @@ async function handleDeleteAccount(){
     updateAvatar();
     authContainer.style.display='block';
     chatContainer.style.display='none';
+    signupBox.style.display='block';
+    loginBox.style.display='none';
     if(socket) socket.disconnect();
   }else{
     const data=await res.json();
@@ -172,6 +178,12 @@ if (storedUserId) {
   initSocket();
   registerPush();
   fetchUsers();
+} else {
+  // Show signup page for new users
+  authContainer.style.display = 'block';
+  chatContainer.style.display = 'none';
+  signupBox.style.display = 'block';
+  loginBox.style.display = 'none';
 }
 // --------------------------------------------------
 
@@ -184,6 +196,10 @@ showSignup.onclick = () => {
   loginBox.style.display = 'none';
   signupBox.style.display = 'block';
 };
+
+// Show signup page first by default
+signupBox.style.display = 'block';
+loginBox.style.display = 'none';
 
 // Signup
 signupBtn.onclick = async () => {
@@ -260,6 +276,8 @@ if (logoutBtn) logoutBtn.onclick = async () => {
   chatBox.style.display = 'none';
   chatContainer.style.display = 'none';
   authContainer.style.display = 'block';
+  signupBox.style.display = 'block';
+  loginBox.style.display = 'none';
   if (socket) socket.disconnect();
 };
 
@@ -276,7 +294,13 @@ if (deleteBtn) deleteBtn.onclick = async () => {
     alert('Account deleted successfully.');
     localStorage.clear();
     sessionStorage.clear();
-    window.location.reload();
+    currentUserId = null;
+    updateAvatar();
+    authContainer.style.display = 'block';
+    chatContainer.style.display = 'none';
+    signupBox.style.display = 'block';
+    loginBox.style.display = 'none';
+    if (socket) socket.disconnect();
   } else {
     const data = await res.json();
     alert(data.message || 'Failed to delete account.');

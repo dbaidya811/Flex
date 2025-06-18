@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -27,8 +28,8 @@ function writeSubs(arr){ fs.writeFileSync(SUBS_FILE, JSON.stringify(arr, null, 2
 
 webpush.setVapidDetails(
   'mailto:admin@example.com',
-  process.env.PUBLIC_VAPID_KEY || 'REPLACE_WITH_PUBLIC_VAPID_KEY',
-  process.env.PRIVATE_VAPID_KEY || 'REPLACE_WITH_PRIVATE_VAPID_KEY'
+  process.env.PUBLIC_VAPID_KEY || 'BKs7xi3aybGvk9aLkh43jqejsaH0If2I_AlvVTo_l5ewIJgSOSeW-8DDrN2oL-IwULIBPv7qom4K_KLXCKdObfE',
+  process.env.PRIVATE_VAPID_KEY || 'ur3ZsP4asH4PfLuPHY6WgvL3FtcPi20zU6o54f87DDs'
 );
 function sendPushToUser(userId, payload){
   const list = readSubs();
@@ -173,9 +174,14 @@ io.on('connection', (socket) => {
   // Voice call signaling
   socket.on('call_user', ({ to, from, offer }) => {
     console.log(`[Socket.IO] ${from} is calling ${to}`);
+    console.log('DEBUG - Server received call_user with from:', from, 'to:', to);
+    console.log('DEBUG - Server sending incoming_call to room:', to, 'with from:', from);
+    console.log('DEBUG - Current user in this socket:', currentUser);
+    console.log('DEBUG - Socket rooms:', socket.rooms);
+    console.log('DEBUG - About to emit incoming_call to room:', to);
     io.to(to).emit('incoming_call', { from, offer });
-    try{sendPushToUser(to,{title:'Incoming call', body:`${from} is calling…`, url:`/chat.html?userId=${from}`});}catch(e){}
-
+    console.log('DEBUG - Emitted incoming_call to room:', to, 'with from:', from);
+    try{sendPushToUser(to,{title:'Incoming call from ' + from, body:`${from} is calling you…`, url:`/chat.html?userId=${from}`});}catch(e){}
   });
 
   socket.on('call_signal', ({ to, from, data }) => {
@@ -189,7 +195,7 @@ io.on('connection', (socket) => {
 
     // video signalling
   socket.on('video_call',({to,from,offer})=>{io.to(to).emit('incoming_video',{from,offer});
-  try{sendPushToUser(to,{title:'Incoming video call', body:`${from} is video calling…`, url:`/chat.html?userId=${from}`});}catch(e){}
+  try{sendPushToUser(to,{title:'Incoming video call from ' + from, body:`${from} is video calling you…`, url:`/chat.html?userId=${from}`});}catch(e){}
 });
   socket.on('video_signal',({to,from,data})=>{io.to(to).emit('video_signal',{from,data});});
   socket.on('video_end',({to,from})=>{io.to(to).emit('video_ended');io.to(from).emit('video_ended');});

@@ -127,6 +127,56 @@ function saveToHistory(entry) {
 loadHistory();
 // =====================================
 
+// Global event delegation for double-click on file messages
+messagesDiv.addEventListener('dblclick', (ev) => {
+  const target = ev.target;
+  const messageDiv = target.closest('.message');
+  
+  if (!messageDiv) return;
+  
+  const mid = messageDiv.getAttribute('data-mid');
+  if (!mid) return;
+  
+  // Check if click is on file message elements or text message
+  const isFileMessage = target.closest('.file-message');
+  const isVoiceMessage = target.closest('.voice-message');
+  const isChatMedia = target.classList.contains('chat-media');
+  const isFileLink = target.closest('.file-link');
+  const isMessageDiv = target === messageDiv;
+  const isMessageTime = target.closest('.message-time');
+  const isDeleteBtn = target.closest('.delete-btn');
+  
+  if (isFileMessage || isVoiceMessage || isChatMedia || isFileLink || isMessageDiv || isMessageTime || isDeleteBtn) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    
+    // Get the message content from the DOM
+    let copyText = '';
+    const fileInfo = messageDiv.querySelector('.file-info');
+    const fileName = messageDiv.querySelector('.file-name');
+    const voiceMessage = messageDiv.querySelector('.voice-message');
+    
+    if (fileInfo) {
+      copyText = fileInfo.textContent;
+    } else if (fileName) {
+      copyText = fileName.textContent;
+    } else if (voiceMessage) {
+      copyText = 'Voice Message';
+    } else {
+      // For text messages, get the text content excluding time and delete button
+      const messageContent = messageDiv.cloneNode(true);
+      const timeElement = messageContent.querySelector('.message-time');
+      const deleteElement = messageContent.querySelector('.delete-btn');
+      if (timeElement) timeElement.remove();
+      if (deleteElement) deleteElement.remove();
+      copyText = messageContent.textContent.replace(/[\n\r]/g, ' ').trim();
+    }
+    
+    const isSent = messageDiv.classList.contains('sent');
+    showContextMenu(ev, mid, copyText, isSent);
+  }
+});
+
 // ---- Selection & Drag-to-Delete UI ----
 let selectedIds = new Set();
 // create trash zone (floating action button)
@@ -178,7 +228,11 @@ function performLocalDelete(ids){
   if(!ids.length) return;
   ids.forEach(id=>{
     const el=document.querySelector(`[data-mid="${id}"]`);
-    if(el){el.classList.add('fade-out');setTimeout(()=>el.remove(),300);} });
+    if(el){
+      el.classList.add('fade-out');
+      setTimeout(()=>el.remove(),300);
+    }
+  });
   const delKey=deletedKey();
   const deletedArr=JSON.parse(localStorage.getItem(delKey)||'[]');
   ids.forEach(id=>{ if(!deletedArr.includes(id)) deletedArr.push(id); });
@@ -194,38 +248,64 @@ function performLocalDelete(ids){
 function showContextMenu(ev, mid, copyText, isSent){
   ev.preventDefault();
   document.querySelectorAll('.msg-context-menu').forEach(m=>m.remove());
-  if(!document.getElementById('ctx-style')){
-    const style=document.createElement('style');
-    style.id='ctx-style';
-    style.textContent=`.msg-context-menu{position:fixed;background:#fff;border:1px solid #ddd;border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,0.15);z-index:1000;} .msg-context-menu button{display:block;width:100%;padding:6px 10px;border:none;background:none;text-align:left;cursor:pointer;font-size:14px;} .msg-context-menu button:hover{background:#f0f0f0;}`;
-    document.head.appendChild(style);
-  }
+  
   const menu=document.createElement('div');
   menu.className='msg-context-menu';
+  
+  // Position menu at click point
   menu.style.top=ev.clientY+'px';
-  // Default anchor at click point then adjust after insertion
   menu.style.left=ev.clientX+'px';
+  
   const copyBtn=document.createElement('button');
-  copyBtn.textContent='Copy';
-  copyBtn.onclick=()=>{ if(copyText) navigator.clipboard.writeText(copyText); menu.remove(); };
+  copyBtn.textContent='📋 Copy';
+  copyBtn.onclick=()=>{ 
+    if(copyText) {
+      navigator.clipboard.writeText(copyText);
+      // Show feedback
+      copyBtn.textContent = '✅ Copied!';
+      setTimeout(() => {
+        copyBtn.textContent = '📋 Copy';
+      }, 1000);
+    }
+    menu.remove(); 
+  };
+  
   const delBtn=document.createElement('button');
-  delBtn.textContent='Delete';
-  delBtn.onclick=()=>{ performLocalDelete([mid]); menu.remove(); };
+  delBtn.textContent='🗑️ Delete (Local)';
+  delBtn.onclick=()=>{ 
+    performLocalDelete([mid]); 
+    menu.remove(); 
+  };
+  
   const delAllBtn=document.createElement('button');
-  delAllBtn.textContent='Delete for All';
-  delAllBtn.onclick=()=>{ performDelete([mid]); menu.remove(); };
+  delAllBtn.textContent='🗑️ Delete for All';
+  delAllBtn.onclick=()=>{ 
+    performDelete([mid]); 
+    menu.remove(); 
+  };
+  
   [copyBtn, delBtn, delAllBtn].forEach(b=>menu.appendChild(b));
   document.body.appendChild(menu);
-  // After added, reposition horizontally opposite of message side
+  
+  // Reposition menu to ensure it stays within viewport
   const rect = menu.getBoundingClientRect();
-  if(isSent){
-    // message on right, place menu left of click so it points inward
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  
+  // Adjust horizontal position
+  if(rect.right > viewportWidth) {
     menu.style.left = (ev.clientX - rect.width - 8) + 'px';
-  }else{
-    // message on left, place menu right of click
-    menu.style.left = (ev.clientX + 8) + 'px';
   }
-  setTimeout(()=>{document.addEventListener('click', ()=>menu.remove(), { once:true});},0);
+  
+  // Adjust vertical position
+  if(rect.bottom > viewportHeight) {
+    menu.style.top = (ev.clientY - rect.height - 8) + 'px';
+  }
+  
+  // Close menu when clicking outside
+  setTimeout(()=>{
+    document.addEventListener('click', ()=>menu.remove(), { once:true });
+  }, 0);
 }
 
 // ===== Full-screen media viewer =====
@@ -246,24 +326,19 @@ function showContextMenu(ev, mid, copyText, isSent){
     if(media) setZoom(media,e.deltaY);
     e.preventDefault();
   },{passive:false});
-  // delegation
+  
+  // Single click handler for media files to show fullscreen preview
   messagesDiv.addEventListener('click', (e)=>{
     const target = e.target;
     if(!target.classList.contains('chat-media')) return;
+    
+    // Only handle single clicks, double-clicks are handled by global event delegation
+    if(e.detail !== 1) return;
+    
     const messageDiv = target.closest('.message');
     if(!messageDiv) return;
-    const mid = messageDiv.getAttribute('data-mid');
-    const isSent = messageDiv.classList.contains('sent');
 
-    // If double-click (detail===2) show context menu instead of fullscreen preview
-    if(e.detail === 2){
-      e.preventDefault();
-      const copyText = target.getAttribute('alt') || '';
-      showContextMenu(e, mid, copyText, isSent);
-      return;
-    }
-
-    // Single click – show fullscreen preview
+    // Show fullscreen preview
     const src = target.src || target.currentSrc;
     overlay.innerHTML='';
     let elem;
@@ -340,6 +415,7 @@ function closePeerConnection() {
 
 async function startCall() {
   if (!chattingWith) return;
+  console.log('CALL DEBUG: currentUserId:', currentUserId, 'chattingWith:', chattingWith);
   await initLocalStream();
   peerConnection = new RTCPeerConnection(rtcConfig);
   localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
@@ -354,6 +430,7 @@ async function startCall() {
   };
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
+  console.log('DEBUG - Emitting call_user with to:', chattingWith, 'from:', currentUserId);
   socket.emit('call_user', { to: chattingWith, from: currentUserId, offer });
 }
 
@@ -399,7 +476,13 @@ if (callBtn) {
 
 // Socket listeners for call
 socket.on('incoming_call', async ({ from, offer }) => {
-  const accept = confirm(`${from} is calling. Accept?`);
+  console.log('DEBUG - Incoming call from:', from, 'Current user:', currentUserId, 'Chatting with:', chattingWith);
+  console.log('DEBUG - Caller ID (from):', from);
+  console.log('DEBUG - This should be the person who initiated the call');
+  // The 'from' parameter should always be the person who is calling
+  // Even if we're currently chatting with someone else
+  const callerId = from; // This is the person who initiated the call
+  const accept = confirm(`${callerId} is calling you. Accept?`);
   if (!accept) {
     socket.emit('end_call', { to: from, from: currentUserId });
     return;
@@ -425,70 +508,243 @@ socket.on('call_ended', () => {
 /********** Video Call logic ***********/
 async function initVideoStream(){
   if(videoStream) return videoStream;
-  videoStream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
-  localVideo.srcObject = videoStream;
-  localVideo.play().catch(()=>{});
-  return videoStream;
+  console.log('DEBUG - Initializing video stream');
+  try {
+    // Request both video and audio with specific constraints
+    videoStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        facingMode: 'user'
+      },
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+    
+    console.log('DEBUG - Video stream obtained:', videoStream.getTracks().length, 'tracks');
+    console.log('DEBUG - Tracks:', videoStream.getTracks().map(t => t.kind));
+    
+    if(localVideo) {
+      localVideo.srcObject = videoStream;
+      localVideo.muted = true; // Mute local video to prevent echo
+      localVideo.play().catch(err=>console.log('Local video play error:', err));
+      console.log('DEBUG - Local video set');
+    }
+    return videoStream;
+  } catch(err) {
+    console.error('DEBUG - Error getting video stream:', err);
+    // Try with just video if audio fails
+    try {
+      videoStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user'
+        }
+      });
+      console.log('DEBUG - Video-only stream obtained');
+      if(localVideo) {
+        localVideo.srcObject = videoStream;
+        localVideo.muted = true;
+        localVideo.play().catch(err=>console.log('Local video play error:', err));
+      }
+      return videoStream;
+    } catch(videoErr) {
+      console.error('DEBUG - Error getting video-only stream:', videoErr);
+      throw videoErr;
+    }
+  }
 }
 function closeVideoPeer(){
+  console.log('DEBUG - Closing video peer');
   if(videoBtn) videoBtn.textContent='🎥';
-  if(videoPeer){videoPeer.close();videoPeer=null;}
+  if(videoPeer){
+    videoPeer.close();
+    videoPeer=null;
+    console.log('DEBUG - Video peer closed');
+  }
   if(videoOverlay) videoOverlay.style.display='none';
-  remoteVideo.srcObject=null;
+  if(remoteVideo) remoteVideo.srcObject=null;
+  if(localVideo && videoStream) {
+    videoStream.getTracks().forEach(track => track.stop());
+    videoStream = null;
+    localVideo.srcObject = null;
+    console.log('DEBUG - Video streams stopped and cleaned up');
+  }
 }
 async function startVideoCall(){
   if(!chattingWith) return;
-  await initVideoStream();
-  videoPeer = new RTCPeerConnection(rtcConfig);
-  videoStream.getTracks().forEach(t=>videoPeer.addTrack(t,videoStream));
-  videoPeer.onicecandidate=e=>{if(e.candidate) socket.emit('video_signal',{to:chattingWith,from:currentUserId,data:{candidate:e.candidate}});};
-  videoPeer.ontrack=e=>{remoteVideo.srcObject=e.streams[0];
-        remoteVideo.play().catch(()=>{});};
-  const offer=await videoPeer.createOffer();
-  await videoPeer.setLocalDescription(offer);
-  console.log('emit video_call to', chattingWith);
-socket.emit('video_call',{to:chattingWith,from:currentUserId,offer});
-  videoOverlay.style.display='flex';
+  console.log('DEBUG - Starting video call to:', chattingWith);
+  
+  try {
+    await initVideoStream();
+    videoPeer = new RTCPeerConnection(rtcConfig);
+    
+    // Add all tracks from the stream
+    videoStream.getTracks().forEach(track => {
+      console.log('DEBUG - Adding track to peer connection:', track.kind);
+      videoPeer.addTrack(track, videoStream);
+    });
+    
+    videoPeer.onicecandidate = e => {
+      if(e.candidate) {
+        console.log('DEBUG - Sending ICE candidate');
+        socket.emit('video_signal', {to: chattingWith, from: currentUserId, data: {candidate: e.candidate}});
+      }
+    };
+    
+    videoPeer.ontrack = e => {
+      console.log('DEBUG - Received remote video stream');
+      if(remoteVideo) {
+        remoteVideo.srcObject = e.streams[0];
+        remoteVideo.play().catch(err => console.log('Remote video play error:', err));
+      }
+    };
+    
+    videoPeer.oniceconnectionstatechange = () => {
+      console.log('DEBUG - ICE connection state:', videoPeer.iceConnectionState);
+    };
+    
+    const offer = await videoPeer.createOffer();
+    await videoPeer.setLocalDescription(offer);
+    console.log('DEBUG - Emitting video_call to', chattingWith);
+    socket.emit('video_call', {to: chattingWith, from: currentUserId, offer});
+    
+    if(videoOverlay) videoOverlay.style.display = 'flex';
+    if(videoBtn) videoBtn.textContent = '🔴';
+    console.log('DEBUG - Video overlay displayed');
+  } catch(err) {
+    console.error('DEBUG - Error starting video call:', err);
+    alert('Failed to start video call. Please check camera and microphone permissions.');
+  }
 }
-async function handleVideoOffer(from,offer){
-  await initVideoStream();
-  videoPeer = new RTCPeerConnection(rtcConfig);
-  videoStream.getTracks().forEach(t=>videoPeer.addTrack(t,videoStream));
-  videoPeer.onicecandidate=e=>{if(e.candidate) socket.emit('video_signal',{to:from,from:currentUserId,data:{candidate:e.candidate}});};
-  videoPeer.ontrack=e=>{remoteVideo.srcObject=e.streams[0];
-        remoteVideo.play().catch(()=>{});};
-  await videoPeer.setRemoteDescription(new RTCSessionDescription(offer));
-  const answer=await videoPeer.createAnswer();
-  await videoPeer.setLocalDescription(answer);
-  socket.emit('video_signal',{to:from,from:currentUserId,data:{answer}});
-  videoOverlay.style.display='flex';
+async function handleVideoOffer(from, offer){
+  console.log('DEBUG - Handling video offer from:', from);
+  
+  try {
+    await initVideoStream();
+    videoPeer = new RTCPeerConnection(rtcConfig);
+    
+    // Add all tracks from the stream
+    videoStream.getTracks().forEach(track => {
+      console.log('DEBUG - Adding track to peer connection:', track.kind);
+      videoPeer.addTrack(track, videoStream);
+    });
+    
+    videoPeer.onicecandidate = e => {
+      if(e.candidate) {
+        console.log('DEBUG - Sending ICE candidate');
+        socket.emit('video_signal', {to: from, from: currentUserId, data: {candidate: e.candidate}});
+      }
+    };
+    
+    videoPeer.ontrack = e => {
+      console.log('DEBUG - Received remote video stream in handleVideoOffer');
+      if(remoteVideo) {
+        remoteVideo.srcObject = e.streams[0];
+        remoteVideo.play().catch(err => console.log('Remote video play error:', err));
+      }
+    };
+    
+    videoPeer.oniceconnectionstatechange = () => {
+      console.log('DEBUG - ICE connection state:', videoPeer.iceConnectionState);
+    };
+    
+    await videoPeer.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await videoPeer.createAnswer();
+    await videoPeer.setLocalDescription(answer);
+    socket.emit('video_signal', {to: from, from: currentUserId, data: {answer}});
+    
+    if(videoOverlay) videoOverlay.style.display = 'flex';
+    if(videoBtn) videoBtn.textContent = '🔴';
+    console.log('DEBUG - Video overlay displayed in handleVideoOffer');
+  } catch(err) {
+    console.error('DEBUG - Error handling video offer:', err);
+    alert('Failed to accept video call. Please check camera and microphone permissions.');
+  }
 }
-async function handleVideoAnswer(answer){if(videoPeer) await videoPeer.setRemoteDescription(new RTCSessionDescription(answer));}
-function handleVideoCandidate(c){if(videoPeer) videoPeer.addIceCandidate(new RTCIceCandidate(c));}
-if(videoBtn){videoBtn.addEventListener('click',()=>{
-  if(videoPeer){
-    socket.emit('video_end',{to:chattingWith,from:currentUserId});
+async function handleVideoAnswer(answer){
+  if(videoPeer) {
+    try {
+      console.log('DEBUG - Handling video answer');
+      await videoPeer.setRemoteDescription(new RTCSessionDescription(answer));
+      console.log('DEBUG - Video answer handled successfully');
+    } catch(err) {
+      console.error('DEBUG - Error handling video answer:', err);
+    }
+  }
+}
+function handleVideoCandidate(c){
+  if(videoPeer) {
+    try {
+      console.log('DEBUG - Handling video candidate');
+      videoPeer.addIceCandidate(new RTCIceCandidate(c));
+      console.log('DEBUG - Video candidate added successfully');
+    } catch(err) {
+      console.error('DEBUG - Error handling video candidate:', err);
+    }
+  }
+}
+if(videoBtn){
+  videoBtn.addEventListener('click', () => {
+    console.log('DEBUG - Video button clicked, current videoPeer:', videoPeer);
+    if(videoPeer){
+      console.log('DEBUG - Ending video call');
+      socket.emit('video_end', {to: chattingWith, from: currentUserId});
+      closeVideoPeer();
+      videoBtn.textContent = '🎥';
+    } else {
+      console.log('DEBUG - Starting video call');
+      startVideoCall().catch(err => {
+        console.error('DEBUG - Failed to start video call:', err);
+        videoBtn.textContent = '🎥';
+      });
+    }
+  });
+}
+if(endVideoBtn){
+  endVideoBtn.addEventListener('click', () => {
+    console.log('DEBUG - End video button clicked');
+    socket.emit('video_end', {to: chattingWith, from: currentUserId});
     closeVideoPeer();
-    videoBtn.textContent='🎥';
-  } else {
-    startVideoCall();
-  }
-});}
-if(endVideoBtn){endVideoBtn.addEventListener('click',()=>{socket.emit('video_end',{to:chattingWith,from:currentUserId});closeVideoPeer();});}
+  });
+}
 // socket listeners
-socket.on('incoming_video',async({from,offer})=>{
-  console.log('incoming_video from', from);
-  if(confirm(`${from} is video calling. Accept?`)){
-    handleVideoOffer(from,offer);
+socket.on('incoming_video', async ({from, offer}) => {
+  console.log('DEBUG - Incoming video call from:', from, 'Current user:', currentUserId);
+  console.log('DEBUG - Video caller ID (from):', from);
+  const videoCallerId = from; // Explicitly use the caller's ID
+  if(confirm(`${videoCallerId} is video calling you. Accept?`)){
+    console.log('DEBUG - Video call accepted, handling offer');
+    try {
+      await handleVideoOffer(from, offer);
+    } catch(err) {
+      console.error('DEBUG - Failed to handle video offer:', err);
+      alert('Failed to accept video call. Please check camera and microphone permissions.');
+    }
   } else {
-    socket.emit('video_end',{to:from,from:currentUserId});
+    console.log('DEBUG - Video call rejected');
+    socket.emit('video_end', {to: from, from: currentUserId});
   }
 });
-socket.on('video_signal',({from,data})=>{
-  console.log('video_signal from', from, data);
-  if(data.answer) handleVideoAnswer(data.answer); else if(data.candidate) handleVideoCandidate(data.candidate);
+socket.on('video_signal', ({from, data}) => {
+  console.log('DEBUG - Video signal from:', from, 'data type:', Object.keys(data));
+  if(data.answer) {
+    console.log('DEBUG - Handling video answer');
+    handleVideoAnswer(data.answer);
+  } else if(data.candidate) {
+    console.log('DEBUG - Handling video candidate');
+    handleVideoCandidate(data.candidate);
+  }
 });
-socket.on('video_ended',()=>{alert('Video call ended');closeVideoPeer();});
+socket.on('video_ended', () => {
+  console.log('DEBUG - Video call ended');
+  alert('Video call ended');
+  closeVideoPeer();
+});
 /********** End Video ***********/
 /****************************************/ 
 // ---------------------------------
@@ -564,14 +820,14 @@ socket.on('receive_message', ({ from, to, message, time, id }) => {
     saveToHistory({ from, to, message, time, id, type: 'text' });
   }
 });
-socket.on('receive_file', ({ from, to, fileName, fileType, dataUrl, time }) => {
+socket.on('receive_file', ({ from, to, fileName, fileType, dataUrl, time, id }) => {
   if (from === currentUserId) return; // already rendered locally
   const isChatting = (to === chattingWith && from === currentUserId) || (to === currentUserId && from === chattingWith);
   if (isChatting) {
     const imageFlag = fileType && fileType.startsWith('image/') ? dataUrl : undefined;
     const videoFlag = fileType && fileType.startsWith('video/') ? dataUrl : undefined;
-    addMessage(from, { fileName, fileType, dataUrl, image: imageFlag, video: videoFlag }, new Date(time));
-    saveToHistory({ from, to, fileName, fileType, dataUrl, image: imageFlag, video: videoFlag, time, type: 'file' });
+    addMessage(from, { fileName, fileType, dataUrl, image: imageFlag, video: videoFlag }, new Date(time), id);
+    saveToHistory({ from, to, fileName, fileType, dataUrl, image: imageFlag, video: videoFlag, time, id, type: 'file' });
   }
 });
 
@@ -781,7 +1037,9 @@ function readFileAsDataURL(file) {
 function addMessage(sender, content, time, id = null) {
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ${sender === currentUserId ? 'sent' : 'received'}`;
-  if (id) messageDiv.setAttribute('data-mid', id);
+  if (id) {
+    messageDiv.setAttribute('data-mid', id);
+  }
 
   let messageContent = '';
   if (typeof content === 'string') {
@@ -850,14 +1108,6 @@ function addMessage(sender, content, time, id = null) {
   messageDiv.addEventListener('dragend', () => {
     selectedIds.delete(id);
     updateTrashState();
-  });
-
-  // Double-click context menu
-  messageDiv.addEventListener('dblclick', (ev) => {
-    if(!id) return;
-    const copyText = typeof content === 'string' ? content : (content.fileName ? content.fileName : '');
-    const isSent = messageDiv.classList.contains('sent');
-    showContextMenu(ev, id, copyText, isSent);
   });
 
   // Add click to select
